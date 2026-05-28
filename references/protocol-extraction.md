@@ -6,6 +6,7 @@ Extract these facts from the current protocol before building.
 
 - Screening, baseline/D1, treatment visits, open-label visits, EOT, safety follow-up, unscheduled visits.
 - Visit labels and order for display.
+- Extract labels from the study flow table. Use Vxx/访视xx labels only if the flow table has them. Otherwise use Dxx or Wxx exactly as supported by the flow table.
 - Which visits define “study period”, “treatment period”, and “follow-up period”.
 - Whether unscheduled visits should count in first/last actual visit. Default: include if the protocol says “研究期间” and the visit occurred.
 
@@ -50,3 +51,6 @@ Before building, report:
 - Sheet/column mapping summary.
 - Definitions found in protocol, with exact short paraphrase and source section/page when available.
 - Missing definitions or ambiguous fields requiring user confirmation.
+- Population decision: all subjects vs randomized subjects only.
+- USV decision: include or exclude planed/unplanned visit data.
+- Grouping/randomization source: uploaded group table, randomization sheet, screening result sheet, or unresolved.

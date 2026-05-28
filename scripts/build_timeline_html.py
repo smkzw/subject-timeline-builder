@@ -85,6 +85,24 @@ def center_value(row, cfg):
     return val(row, cfg, "center").strip() or "未识别中心"
 
 
+def truthy(value):
+    return str(value or "").strip() in ("是", "Yes", "Y", "1", "TRUE", "True")
+
+
+def is_screen_failed_status(value):
+    text = str(value or "")
+    return any(x in text for x in ["筛选失败", "筛败", "未入组", "未随机", "Screen Failure"])
+
+
+def subject_status(row, cfg):
+    for key in ("status", "subject_status", "screen_status", "random_status"):
+        if col(cfg, key):
+            text = val(row, cfg, key).strip()
+            if text:
+                return text
+    return ""
+
+
 def normalize_visit(visit, visit_order):
     text = str(visit or "")
     for item in visit_order:
@@ -96,6 +114,8 @@ def normalize_visit(visit, visit_order):
 def sorted_visit_dates(subject, visits, visits_cfg, visit_order):
     rows = []
     for row in visits.get(subject, []):
+        if row.get("__is_usv") and not visits_cfg.get("include_usv", False):
+            continue
         occurred_col = col(visits_cfg, "occurred")
         if occurred_col and row.get(occurred_col) not in ("", "是", "Yes", "Y", "1", "TRUE", "True"):
             continue
@@ -159,11 +179,58 @@ def cm_reason(row, cfg):
     reason_mh = val(row, cfg, "reason_mh")
     reason_ae = val(row, cfg, "reason_ae")
     other = val(row, cfg, "reason_other")
+    note = val(row, cfg, "note")
+    details = [row.get(c, "") for c in cfg.get("reason_detail_columns", []) if row.get(c, "")]
     if reason_ae:
         return f"AE: {reason_ae}"
     if reason_mh:
         return f"病史: {reason_mh}"
+    if details:
+        return f"{reason}: " + "；".join(details)
+    if any(x in reason for x in ["不良事件", "既往", "现病史", "病史"]) and note:
+        return f"{reason}: {note}"
     return other or reason
+
+
+def cm_reason_needs_confirmation(row, cfg):
+    reason = val(row, cfg, "reason")
+    linked_reason = "不良事件" in reason or ("其他" in reason and any(x in reason for x in ["既往", "现病史", "病史"]))
+    if not linked_reason:
+        return False
+    reason_mh = val(row, cfg, "reason_mh")
+    reason_ae = val(row, cfg, "reason_ae")
+    note = val(row, cfg, "note")
+    details = [row.get(c, "") for c in cfg.get("reason_detail_columns", []) if row.get(c, "")]
+    return not any([reason_mh, reason_ae, note, details])
+
+
+def load_group_info(path, group_cfg, skip_subjects):
+    info = {}
+    if not path or not group_cfg:
+        return info
+    for row in load_sheet(path, group_cfg):
+        sid = subject_key(row, group_cfg)
+        if not sid or sid in skip_subjects:
+            continue
+        group = val(row, group_cfg, "group")
+        status = subject_status(row, group_cfg)
+        random_no = val(row, group_cfg, "random_no")
+        label = "筛败" if is_screen_failed_status(status) else (group or ("已随机" if random_no else ""))
+        info[sid] = {
+            "group": group,
+            "status": status,
+            "random_no": random_no,
+            "label": label or status,
+            "is_randomized": bool(group or random_no) and not is_screen_failed_status(status),
+            "is_screen_failed": is_screen_failed_status(status),
+        }
+    return info
+
+
+def display_subject(sid, group_info, fallback_status=""):
+    info = group_info.get(sid, {})
+    label = info.get("label") or ("筛败" if is_screen_failed_status(fallback_status) else "")
+    return f"{sid} | {label}" if label else sid
 
 
 def render_svg(subject, visit_rows, ae_rows, mh_rows, cm_rows, cfg, window_start, window_end, visit_order):
@@ -236,6 +303,7 @@ def main():
     ap.add_argument("--output", required=True)
     ap.add_argument("--pk-listing")
     ap.add_argument("--finding-listing")
+    ap.add_argument("--group-listing")
     args = ap.parse_args()
 
     config = json.loads(Path(args.config).read_text(encoding="utf-8"))
@@ -244,15 +312,41 @@ def main():
     visit_order = config.get("visit_order", [])
     patterns = config.get("research_drug_name_patterns", [])
     skip_subjects = set(config.get("skip_subject_values", ["SUBJID", "Subject", "SUBJECT", "受试者"]))
+    population = config.get("population", "all")
+    sheets["visits"] = dict(sheets["visits"])
+    sheets["visits"]["include_usv"] = config.get("include_usv", False)
 
     visits_rows = load_sheet(args.listing, sheets["visits"])
     visits = defaultdict(list)
     centers = {}
+    statuses = {}
     for row in visits_rows:
         sid = subject_key(row, sheets["visits"])
         if sid and sid not in skip_subjects:
             visits[sid].append(row)
             centers[sid] = center_value(row, sheets["visits"])
+            statuses.setdefault(sid, subject_status(row, sheets["visits"]))
+
+    if config.get("include_usv", False) and sheets.get("usv"):
+        usv_cfg = sheets["usv"]
+        for row in load_sheet(args.listing, usv_cfg):
+            sid = subject_key(row, usv_cfg)
+            d = val(row, usv_cfg, "date")
+            if sid and sid not in skip_subjects and d:
+                row = dict(row)
+                row["__is_usv"] = "1"
+                row[col(sheets["visits"], "subject")] = sid
+                row[col(sheets["visits"], "center")] = center_value(row, usv_cfg)
+                row[col(sheets["visits"], "date")] = d
+                row[col(sheets["visits"], "visit")] = usv_cfg.get("label", "USV")
+                row["__usv_label"] = usv_cfg.get("label", "USV")
+                visits[sid].append(row)
+                centers.setdefault(sid, center_value(row, usv_cfg))
+                statuses.setdefault(sid, subject_status(row, usv_cfg))
+
+    group_info = load_group_info(args.group_listing or args.listing, sheets.get("group"), skip_subjects)
+    if population == "randomized" and not group_info:
+        raise SystemExit("population=randomized requires a group/randomization mapping or --group-listing.")
 
     grouped = {"ae": defaultdict(list), "mh": defaultdict(list), "cm": defaultdict(list), "pk": defaultdict(list), "findings": defaultdict(list)}
     if modules.get("ae") and sheets.get("ae"):
@@ -262,12 +356,14 @@ def main():
             if sid and sid not in skip_subjects and term:
                 grouped["ae"][sid].append(row)
                 centers.setdefault(sid, center_value(row, sheets["ae"]))
+                statuses.setdefault(sid, subject_status(row, sheets["ae"]))
     if modules.get("mh") and sheets.get("mh"):
         for row in load_sheet(args.listing, sheets["mh"]):
             sid = subject_key(row, sheets["mh"])
             if sid and sid not in skip_subjects and val(row, sheets["mh"], "term"):
                 grouped["mh"][sid].append(row)
                 centers.setdefault(sid, center_value(row, sheets["mh"]))
+                statuses.setdefault(sid, subject_status(row, sheets["mh"]))
     if modules.get("cm") and sheets.get("cm"):
         for row in load_sheet(args.listing, sheets["cm"]):
             sid = subject_key(row, sheets["cm"])
@@ -275,6 +371,7 @@ def main():
             if sid and sid not in skip_subjects and name and not is_research_drug(name, patterns):
                 grouped["cm"][sid].append(row)
                 centers.setdefault(sid, center_value(row, sheets["cm"]))
+                statuses.setdefault(sid, subject_status(row, sheets["cm"]))
     if modules.get("pk") and sheets.get("pk"):
         pk_path = args.pk_listing or args.listing
         for row in load_sheet(pk_path, sheets["pk"]):
@@ -288,11 +385,14 @@ def main():
                 grouped["findings"][sid].append(row)
 
     subjects = sorted(set(visits) | set(grouped["ae"]) | set(grouped["mh"]) | set(grouped["cm"]) | set(grouped["pk"]) | set(grouped["findings"]))
-    stats = {"subjects": len(subjects), "centers": len(set(centers.values())), "cm_prior": 0, "cm_concomitant": 0, "missing_windows": 0}
+    if population == "randomized":
+        subjects = [sid for sid in subjects if group_info.get(sid, {}).get("is_randomized")]
+    stats = {"subjects": len(subjects), "centers": len(set(centers.get(s, "未识别中心") for s in subjects)), "cm_prior": 0, "cm_concomitant": 0, "cm_reason_needs_confirmation": 0, "missing_windows": 0, "population": population}
 
     cards = []
     for sid in subjects:
         center = centers.get(sid, "未识别中心")
+        display_sid = display_subject(sid, group_info, statuses.get(sid, ""))
         win_start, win_end = window_from_visits(sid, visits, sheets["visits"], config.get("study_window", {}), visit_order)
         hist_start, hist_end = window_from_visits(sid, visits, sheets["visits"], config.get("history_window", config.get("study_window", {})), visit_order)
         if not win_start or not win_end:
@@ -300,6 +400,8 @@ def main():
         cm_prior, cm_con = [], []
         cm_cfg = sheets.get("cm", {})
         for row in grouped["cm"].get(sid, []):
+            if cm_reason_needs_confirmation(row, cm_cfg):
+                stats["cm_reason_needs_confirmation"] += 1
             if overlaps_window(row, cm_cfg, col(cm_cfg, "start"), col(cm_cfg, "end"), col(cm_cfg, "ongoing"), win_start, win_end):
                 cm_con.append(row)
             else:
@@ -315,7 +417,7 @@ def main():
         if modules.get("ae", True):
             ae_cfg = sheets.get("ae", {})
             sections.append('<div class="box"><h3>AE</h3>' + render_list([
-                li(f"<strong>{esc(val(r, ae_cfg, 'term'))}</strong>｜{esc(val(r, ae_cfg, 'start'))} ~ {esc(val(r, ae_cfg, 'end'))}｜{esc(val(r, ae_cfg, 'grade'))}｜关系 {esc(val(r, ae_cfg, 'relationship'))}｜SAE {esc(val(r, ae_cfg, 'sae'))}")
+                li(f"<strong>{esc(val(r, ae_cfg, 'term'))}</strong>｜{esc(val(r, ae_cfg, 'start'))} ~ {esc(val(r, ae_cfg, 'end'))}｜{esc(val(r, ae_cfg, 'grade'))}｜关系 {esc(val(r, ae_cfg, 'relationship'))}｜SAE {esc(val(r, ae_cfg, 'sae'))}｜转归 {esc(val(r, ae_cfg, 'outcome'))}")
                 for r in ae_rows
             ], "未检出 AE") + "</div>")
         if modules.get("mh", True):
@@ -359,13 +461,13 @@ def main():
         subtitle = f"{esc(center)}｜研究窗口：{esc(win_start)} ~ {esc(win_end)}"
         cards.append(f'''
 <section class="subject-card" data-subject="{esc(sid)}" data-center="{esc(center)}">
-  <div class="subject-top"><h2>{esc(sid)}</h2><div class="subject-sub">{subtitle}</div></div>
+  <div class="subject-top"><h2>{esc(display_sid)}</h2><div class="subject-sub">{subtitle}</div></div>
   {svg}
   <div class="cols">{"".join(sections)}</div>
 </section>''')
 
-    center_options = "".join(f'<option value="{esc(c)}">{esc(c)}</option>' for c in sorted(set(centers.values())))
-    subject_options = "".join(f'<option value="{esc(s)}">{esc(s)}</option>' for s in subjects)
+    center_options = "".join(f'<option value="{esc(c)}">{esc(c)}</option>' for c in sorted(set(centers.get(s, "未识别中心") for s in subjects)))
+    subject_options = "".join(f'<option value="{esc(s)}">{esc(display_subject(s, group_info, statuses.get(s, "")))}</option>' for s in subjects)
     html_text = f'''<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>{esc(config.get("title", "受试者时间线"))}</title>
 <style>

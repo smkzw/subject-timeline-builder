@@ -22,6 +22,8 @@ Create one JSON file per build. Keep it explicit; do not rely on fuzzy matching 
     "findings": true,
     "pk": true
   },
+  "population": "all",
+  "include_usv": false,
   "sheets": {
     "visits": {
       "name": "SV--访视日期",
@@ -31,6 +33,20 @@ Create one JSON file per build. Keep it explicit; do not rely on fuzzy matching 
       "date": "访视日期",
       "occurred": "访视是否发生？"
     },
+    "usv": {
+      "name": "USV",
+      "center": "试验中心名称",
+      "subject": "受试者编号",
+      "date": "检查日期(USVDAT)",
+      "label": "USV"
+    },
+    "group": {
+      "name": "Sheet1",
+      "subject": "受试者编号",
+      "group": "治疗组",
+      "status": "受试者状态",
+      "random_no": "随机号"
+    },
     "cm": {
       "name": "CM--既往及合并用药治疗",
       "center": "研究中心",
@@ -39,6 +55,8 @@ Create one JSON file per build. Keep it explicit; do not rely on fuzzy matching 
       "reason": "治疗原因",
       "reason_mh": "治疗原因为病史，请选择（可多选）",
       "reason_ae": "治疗原因为不良事件，请选择（可多选）",
+      "reason_detail_columns": ["其他既往及现病史(CMMHNO)", "不良事件(CMAENO)", "备注(CMCO)"],
+      "note": "备注(CMCO)",
       "dose": "单次剂量",
       "unit": "单位",
       "frequency": "给药频率",
@@ -69,6 +87,15 @@ For `first_dose_*`, set `start_visit_match` when D1/baseline labels vary. For `f
 ## Optional Sheets
 
 Add only if the module is enabled.
+
+## Population and USV
+
+- `population: "all"`: include every subject found in the mapped listings.
+- `population: "randomized"`: include only subjects identified as randomized from `sheets.group` via treatment group or random number. If grouping/randomization cannot be mapped, stop and ask the user.
+- `include_usv: true`: include unscheduled visits at subject level and place them by actual USV date. Configure `sheets.usv`.
+- `include_usv: false`: exclude USV from the timeline.
+
+Subject dropdown labels use `subject | group/status` when `sheets.group` is configured. If group status indicates screening failure, display `筛败`.
 
 ### AE
 
