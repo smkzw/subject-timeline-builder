@@ -174,6 +174,10 @@ def render_list(items, empty):
     return "<ul>" + ("".join(items) if items else f"<li>{esc(empty)}</li>") + "</ul>"
 
 
+def compact_join(parts):
+    return "｜".join(str(p) for p in parts if p not in (None, ""))
+
+
 def cm_reason(row, cfg):
     reason = val(row, cfg, "reason")
     reason_mh = val(row, cfg, "reason_mh")
@@ -233,6 +237,57 @@ def display_subject(sid, group_info, fallback_status=""):
     return f"{sid} | {label}" if label else sid
 
 
+def ae_title(row, cfg):
+    return compact_join([
+        val(row, cfg, "term"),
+        f"{val(row, cfg, 'start')} ~ {val(row, cfg, 'end')}",
+        val(row, cfg, "grade"),
+        f"关系: {val(row, cfg, 'relationship')}" if val(row, cfg, "relationship") else "",
+        f"处理: {val(row, cfg, 'action')}" if val(row, cfg, "action") else "",
+        f"SAE: {val(row, cfg, 'sae')}" if val(row, cfg, "sae") else "",
+        f"转归: {val(row, cfg, 'outcome')}" if val(row, cfg, "outcome") else "",
+        val(row, cfg, "note"),
+    ])
+
+
+def mh_title(row, cfg):
+    return compact_join([
+        val(row, cfg, "term"),
+        f"{val(row, cfg, 'start')} ~ {val(row, cfg, 'end')}",
+        f"持续: {val(row, cfg, 'ongoing')}" if val(row, cfg, "ongoing") else "",
+        val(row, cfg, "note"),
+    ])
+
+
+def cm_title(row, cfg):
+    dose = compact_join([val(row, cfg, "dose"), val(row, cfg, "unit")])
+    return compact_join([
+        val(row, cfg, "drug_name"),
+        f"{val(row, cfg, 'start')} ~ {val(row, cfg, 'end')}",
+        f"持续: {val(row, cfg, 'ongoing')}" if val(row, cfg, "ongoing") else "",
+        dose,
+        val(row, cfg, "frequency"),
+        val(row, cfg, "route"),
+        cm_reason(row, cfg),
+        val(row, cfg, "note"),
+    ])
+
+
+def pk_line(row, cfg):
+    parts = [f"<strong>{esc(val(row, cfg, 'visit'))}</strong>"]
+    if val(row, cfg, "result"):
+        parts.append(esc(val(row, cfg, "result")))
+    if val(row, cfg, "lloq"):
+        parts.append(f"LLOQ {esc(val(row, cfg, 'lloq'))}")
+    if val(row, cfg, "date"):
+        parts.append(esc(val(row, cfg, "date")))
+    if val(row, cfg, "time"):
+        parts.append(esc(val(row, cfg, "time")))
+    if val(row, cfg, "note"):
+        parts.append(esc(val(row, cfg, "note")))
+    return "｜".join(parts)
+
+
 def render_svg(subject, visit_rows, ae_rows, mh_rows, cm_rows, cfg, window_start, window_end, visit_order):
     if not window_start or not window_end:
         return ""
@@ -278,21 +333,23 @@ def render_svg(subject, visit_rows, ae_rows, mh_rows, cm_rows, cfg, window_start
         sd = parse_partial_date(val(row, ae_cfg, "start"), "start")
         ed = window_end if val(row, ae_cfg, "ongoing") in ("是", "Yes", "Y") else parse_partial_date(val(row, ae_cfg, "end"), "end") or sd
         x1, x2, y = x_pos(sd), x_pos(ed), ae_y + (idx - 1) * 20
-        title = f"{val(row, ae_cfg, 'term')} | {val(row, ae_cfg, 'start')} ~ {val(row, ae_cfg, 'end')} | {val(row, ae_cfg, 'grade')} | SAE {val(row, ae_cfg, 'sae')}"
+        title = ae_title(row, ae_cfg)
         parts.append(f'<text x="170" y="{y+14}" text-anchor="end" font-size="11" fill="#444">AE#{idx}</text>')
         parts.append(f'<rect x="{x1:.1f}" y="{y}" width="{max(4, x2-x1):.1f}" height="18" rx="3" fill="#b9d6ec" stroke="#666"><title>{esc(title)}</title></rect>')
     for idx, row in enumerate(mh_rows, 1):
         sd = parse_partial_date(val(row, mh_cfg, "start"), "start")
         ed = window_end if val(row, mh_cfg, "ongoing") in ("是", "Yes", "Y") else parse_partial_date(val(row, mh_cfg, "end"), "end") or sd
         x1, x2, y = x_pos(sd), x_pos(ed), mh_y + (idx - 1) * 18
+        title = mh_title(row, mh_cfg)
         parts.append(f'<text x="170" y="{y+11}" text-anchor="end" font-size="11" fill="#444">MH#{idx}</text>')
-        parts.append(f'<rect x="{x1:.1f}" y="{y}" width="{max(4, x2-x1):.1f}" height="15" rx="2" fill="#d9d0ff" stroke="#6b58a6"><title>{esc(val(row, mh_cfg, "term"))}</title></rect>')
+        parts.append(f'<rect x="{x1:.1f}" y="{y}" width="{max(4, x2-x1):.1f}" height="15" rx="2" fill="#d9d0ff" stroke="#6b58a6"><title>{esc(title)}</title></rect>')
     for idx, row in enumerate(cm_rows, 1):
         sd = parse_partial_date(val(row, cm_cfg, "start"), "start")
         ed = window_end if val(row, cm_cfg, "ongoing") in ("是", "Yes", "Y") else parse_partial_date(val(row, cm_cfg, "end"), "end") or sd
         x1, x2, y = x_pos(sd), x_pos(ed), cm_y + (idx - 1) * 18
+        title = cm_title(row, cm_cfg)
         parts.append(f'<text x="170" y="{y+11}" text-anchor="end" font-size="11" fill="#444">CM#{idx}</text>')
-        parts.append(f'<rect x="{x1:.1f}" y="{y}" width="{max(4, x2-x1):.1f}" height="15" rx="2" fill="#7fc97f" stroke="#4f7b46"><title>{esc(val(row, cm_cfg, "drug_name"))}</title></rect>')
+        parts.append(f'<rect x="{x1:.1f}" y="{y}" width="{max(4, x2-x1):.1f}" height="15" rx="2" fill="#7fc97f" stroke="#4f7b46"><title>{esc(title)}</title></rect>')
     return f'<svg viewBox="0 0 {width} {height}" class="svgline">{"".join(parts)}</svg>'
 
 
@@ -448,7 +505,7 @@ def main():
         if modules.get("pk") and sheets.get("pk"):
             pk_cfg = sheets["pk"]
             sections.append('<div class="box"><h3>PK</h3>' + render_list([
-                li(f"<strong>{esc(val(r, pk_cfg, 'visit'))}</strong>｜{esc(val(r, pk_cfg, 'result'))}｜LLOQ {esc(val(r, pk_cfg, 'lloq'))}｜{esc(val(r, pk_cfg, 'note'))}")
+                li(pk_line(r, pk_cfg))
                 for r in grouped["pk"].get(sid, [])
             ], "无 PK 记录") + "</div>")
         if modules.get("findings") and sheets.get("findings"):

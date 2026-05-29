@@ -139,9 +139,15 @@ Subject dropdown labels use `subject | group/status` when `sheets.group` is conf
   "visit": "访视名称",
   "result": "检测结果（ng/mL）",
   "lloq": "LLOQ  ",
+  "date": "采样日期",
+  "time": "采样时间",
   "note": "样本说明"
 }
 ```
+
+If the PK sheet only records whether samples were collected at visits, map the collection flag as collection status only or omit the PK module; do not label that field as a concentration result. Do not configure `lloq` unless the listing has a real LLOQ column/value tied to concrete PK result data.
+
+When a PK page appears to show `是/否` collection status for all subjects/visits rather than numeric concentration results, stop during precheck and ask whether to display collection status only, request a separate PK result listing, or omit PK.
 
 ### Findings
 

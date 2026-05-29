@@ -28,6 +28,7 @@ Fully deconstruct every uploaded file before building. Do not skip protocol, lis
 3. Precheck workbook structure.
    - Run `scripts/inspect_workbook.py` on every workbook.
    - Identify candidate sheets and exact headers for visits, subject demographics, AE, MH, CM, findings, and PK.
+   - For PK, determine whether the file contains concrete PK concentration/result data or only visit-level PK collection flags. If the listing only records whether PK was collected, do not map collection flags as concentration results and do not display LLOQ by default.
    - Record missing or ambiguous fields in a short precheck list.
 
 4. Read and deconstruct the protocol.
@@ -35,6 +36,7 @@ Fully deconstruct every uploaded file before building. Do not skip protocol, lis
    - Extract concomitant medication and prior medication definitions.
    - Extract current/past medical history definitions.
    - Extract PK sampling schedule if relevant.
+   - Confirm whether PK output should show actual PK concentration/results, PK collection status only, or be omitted when no concrete PK result listing is available.
    - Extract the study flow table and use it to define actual visit labels and order. If the table uses Vxx/访视xx labels, include them. If it does not, label visits directly by Dxx or Wxx as shown in the protocol.
    - If no concomitant medication definition is found, ask whether to use: “non-study medications whose use range overlaps first study drug administration through treatment-period final visit”.
    - If no current medical history definition is found, ask whether to use: “conditions whose date range overlaps first study drug administration through the subject’s last study visit”.
@@ -45,6 +47,7 @@ Fully deconstruct every uploaded file before building. Do not skip protocol, lis
    - Do not use fields such as “该治疗是否在本研究治疗期间使用？” as the sole classifier when protocol definitions are date-window based. Treat them as source context only.
    - CM reason display: when the reason is “其他及既往病史/其他既往及现病史” or “不良事件”, extract the specific linked MH/AE from the corresponding listing columns. Also inspect “备注” columns as fallback. If the linked MH/AE cannot be extracted, stop for user confirmation.
    - AE display must include outcome/转归 when available.
+   - Timeline bars for CM, AE, and MH must expose specific source details on hover. AE hover text should include event name, dates, severity, relationship/action, SAE status, outcome, and notes when available. MH hover text should include disease, dates, ongoing status, and notes. CM hover text should include drug name, dates, ongoing status, dose/unit, frequency, route, indication/reason, and notes.
 
 6. Create a mapping JSON.
    - Use `references/config-schema.md`.
@@ -64,6 +67,8 @@ Fully deconstruct every uploaded file before building. Do not skip protocol, lis
    - Verify subject labels show group/screen-failure information when grouping is enabled.
    - Verify AE rows show outcome/转归.
    - Verify CM reasons show linked AE/MH details for AE/MH-related medication reasons.
+   - Verify CM/AE/MH timeline bars show meaningful hover details rather than only generic IDs or names.
+   - Verify PK display matches the actual data type: actual concentration/result listing, collection status only, or omitted module. Do not show `LLOQ` unless an LLOQ column/value was explicitly mapped from a concrete PK result listing.
    - Verify USV dates appear at their actual date positions when USV is enabled.
    - Open or parse the HTML and ensure the filters, cards, and Chinese labels render.
 
@@ -75,6 +80,7 @@ Ask concise questions only for blockers:
 - Ambiguous definition: “方案中未明确合并用药是否按研究期间或治疗期间定义。是否按首次试验药物用药至治疗期末次访视重叠定义合并用药？”
 - Ambiguous raw/coded medication names: “CM sheet 中存在多个药物名称列。是否使用靠前的原始录入药名列？”
 - Optional module absent: “未识别 PK listing。是否不展示 PK 模块？”
+- PK structure ambiguous: “当前 PK sheet 似乎仅记录各访视是否采集 PK，未见具体浓度/检测结果列。请确认是否仅展示 PK 采集状态，或另行上传具体 PK 结果 listing；若不展示 PK 模块，HTML 中将移除该模块。”
 - Missing grouping: “未识别受试者分组/随机结果/筛选结果信息。请上传受试者分组表或指出对应 sheet 和列。”
 - Population scope: “请确认 HTML 纳入所有受试者，还是仅纳入已随机受试者？”
 - USV scope: “请确认是否纳入计划外访视（USV）数据；若纳入，将按 USV 实际日期显示在个例时间线中。”
