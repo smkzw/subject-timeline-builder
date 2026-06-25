@@ -1,5 +1,8 @@
 ---
+slug: subject-timeline-builder
 name: subject-timeline-builder
+displayName: Subject Timeline Builder
+version: 0.1.0
 description: Build Chinese interactive clinical subject timeline HTML and risk-summary workbooks from uploaded study protocols, EDC data listings, prohibited/restricted-medication explanations, deviation/finding listings, grouping tables, AE listings, lab listings, and PK/PD listings. Use when the user asks for “受试者时间线”, subject timeline, patient profile timeline, patient profile HTML, prohibited-medication leak checks, eligibility/protocol-deviation risk overlays, AE-assessment risk flags, or wants to reconstruct per-subject visit dates, medical history, adverse events, prior/concomitant medications or therapies, findings, PK/PD collection/results, and center/subject filters from clinical trial listings.
 ---
 
