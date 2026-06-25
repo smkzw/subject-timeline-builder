@@ -1,4 +1,4 @@
 interface:
   display_name: "Subject Timeline Builder"
-  short_description: "Build clinical subject timeline HTML"
-  default_prompt: "Use $subject-timeline-builder to build a clinical-trial based interactive subject timeline from the protocol, data listings, findings, and PK data."
+  short_description: "Build clinical timelines with risk summaries"
+  default_prompt: "Use $subject-timeline-builder to build a Chinese interactive subject timeline and risk-summary workbook from the protocol, listings, findings, medication rules, AE data, and PK/PD data."

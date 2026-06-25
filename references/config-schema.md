@@ -19,8 +19,12 @@ Create one JSON file per build. Keep it explicit; do not rely on fuzzy matching 
     "ae": true,
     "mh": true,
     "cm": true,
+    "therapy": true,
+    "labs": false,
     "findings": true,
-    "pk": true
+    "pk": true,
+    "pd": false,
+    "risk_workbook": false
   },
   "population": "all",
   "include_usv": false,
@@ -130,7 +134,47 @@ Subject dropdown labels use `subject | group/status` when `sheets.group` is conf
 }
 ```
 
-### PK
+### Therapy
+
+Use this when the listing separates non-drug therapy from medications. If the study displays medication and non-drug therapy together on the graph, keep their source modules distinct in details and risk workbooks.
+
+```json
+"therapy": {
+  "name": "PR--既往及合并非药物治疗",
+  "center": "研究中心",
+  "subject": "受试者",
+  "term": "治疗名称",
+  "reason": "治疗原因",
+  "reason_mh": "治疗原因为病史，请选择（可多选）",
+  "reason_ae": "治疗原因为不良事件，请选择（可多选）",
+  "start": "开始日期",
+  "ongoing": "是否持续",
+  "end": "结束日期",
+  "note": "备注"
+}
+```
+
+### Labs
+
+Map labs when eligibility or safety-risk logic depends on numeric thresholds.
+
+```json
+"labs": {
+  "name": "LB--实验室检查",
+  "center": "研究中心",
+  "subject": "受试者",
+  "visit": "访视名称",
+  "date": "采样日期",
+  "test": "检查项目",
+  "result": "结果",
+  "unit": "单位",
+  "lln": "正常下限",
+  "uln": "正常上限",
+  "flag": "异常标识"
+}
+```
+
+### PK/PD
 
 ```json
 "pk": {
@@ -145,11 +189,11 @@ Subject dropdown labels use `subject | group/status` when `sheets.group` is conf
 }
 ```
 
-If the PK sheet only records whether samples were collected at visits, map the collection flag as collection status only or omit the PK module; do not label that field as a concentration result. Do not configure `lloq` unless the listing has a real LLOQ column/value tied to concrete PK result data.
+If the same workbook contains PD, add a sibling `pd` mapping with the same shape and source-specific labels. If the PK/PD sheet only records whether samples were collected at visits, map the collection flag as collection status only or omit the module; do not label that field as a concentration or biomarker result. Do not configure `lloq` unless the listing has a real LLOQ column/value tied to concrete result data.
 
-When a PK page appears to show `是/否` collection status for all subjects/visits rather than numeric concentration results, stop during precheck and ask whether to display collection status only, request a separate PK result listing, or omit PK.
+When a PK/PD page appears to show `是/否` collection status for all subjects/visits rather than numeric results, stop during precheck and ask whether to display collection status only, request a separate result listing, or omit the module.
 
-### Findings
+### Findings or PD/Deviation Listings
 
 ```json
 "findings": {
@@ -163,6 +207,41 @@ When a PK page appears to show `是/否` collection status for all subjects/visi
   "response": "建议现场核查回复口径"
 }
 ```
+
+For risk registration matching, findings/PD mappings should preserve columns for source row number, category, severity/importance, description, visit/date, response, and any explicit medication/event terms when available.
+
+### Optional Risk Workbook Output
+
+When the user requests prohibited-medication, eligibility, or AE-assessment risk review, create explicit derived risk rows. A recommended internal/output shape is:
+
+```json
+"risk_output": {
+  "enabled": true,
+  "tabs": {
+    "medication_therapy": true,
+    "eligibility": true,
+    "ae_assessment": true
+  },
+  "columns": [
+    "subject",
+    "item_no",
+    "risk_type",
+    "source_module",
+    "source_sheet",
+    "source_row",
+    "source_term",
+    "start",
+    "end",
+    "matched_rule",
+    "matched_keyword",
+    "pd_finding_status",
+    "rationale",
+    "evidence"
+  ]
+}
+```
+
+Status fields must be event-level. For example, a finding/PD row for the same subject and same broad class is not enough; match context, term or normalized core term, and date/range when available.
 
 ## Header Rule
 
