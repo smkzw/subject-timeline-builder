@@ -1,9 +1,10 @@
 ---
 slug: subject-timeline-builder
 name: subject-timeline-builder
-displayName: Subject Timeline Builder
-version: 0.1.0
-description: Build Chinese interactive clinical subject timeline HTML and risk-summary workbooks from uploaded study protocols, EDC data listings, prohibited/restricted-medication explanations, deviation/finding listings, grouping tables, AE listings, lab listings, and PK/PD listings. Use when the user asks for “受试者时间线”, subject timeline, patient profile timeline, patient profile HTML, prohibited-medication leak checks, eligibility/protocol-deviation risk overlays, AE-assessment risk flags, or wants to reconstruct per-subject visit dates, medical history, adverse events, prior/concomitant medications or therapies, findings, PK/PD collection/results, and center/subject filters from clinical trial listings.
+displayName: 受试者时间线构建器
+version: 0.1.1
+summary: 基于临床试验方案和数据列表生成中文受试者时间线，并输出禁用用药、入排、判定合理性等风险汇总。
+description: 根据当前项目的研究方案、电子数据列表、禁用或限制用药解释、方案偏离或核查发现、分组表、不良事件、实验室检查、药代动力学和药效学数据，构建中文交互式受试者时间线和风险汇总工作簿。适用于受试者时间线、个例资料时间轴、禁用药漏报核查、入排违背风险、不良事件判定合理性核查、既往及合并用药或治疗、病史、访视、发现项和采样信息的受试者级重构。
 ---
 
 # Subject Timeline Builder
